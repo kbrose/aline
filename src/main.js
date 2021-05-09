@@ -71,6 +71,7 @@ function isPdfFile(url) {
   return false
 }
 
+// promised version of image.onload()
 function loadImage(url) {
   return new Promise(resolve => {
     const image = new Image();
@@ -86,9 +87,43 @@ function overlayMap(mapUrl, leafletMap) {
   var topRight = [44.890495, -87.384767];
   var bottomLeft = [44.840871, -87.432472];
 
-  function makeOverlay(toOverlay) {
-    var overlay = L.imageOverlay.rotated(toOverlay, topLeft, topRight, bottomLeft, { opacity: 0.5 })
+  function makeOverlay(toOverlay, imgHeight, imgWidth) {
+    const mapBounds = leafletMap.getBounds();
+    const mapHeight = mapBounds.getNorth() - mapBounds.getSouth();
+    // This will likely break horribly at the date line. Sorry!
+    const mapWidth = mapBounds.getEast() - mapBounds.getWest();
+    var loLng;
+    var hiLng;
+    var loLat;
+    var hiLat;
+    if ((imgHeight / imgWidth) > (mapHeight / mapWidth)) {
+      // image is more vertical than map view
+      loLat = mapBounds.getSouth() + mapHeight * 0.2;
+      hiLat = mapBounds.getNorth() - mapHeight * 0.2;
+      loLng = mapBounds.getCenter().lng - 0.6 * mapHeight * imgWidth / imgHeight / 2;
+      hiLng = mapBounds.getCenter().lng + 0.6 * mapHeight * imgWidth / imgHeight / 2;
+    } else {
+      // image is more vertical than map view
+      loLng = mapBounds.getWest() + mapWidth * 0.2;
+      hiLng = mapBounds.getEast() - mapWidth * 0.2;
+      loLat = mapBounds.getCenter().lat - 0.6 * mapWidth * imgHeight / imgWidth / 2;
+      hiLat = mapBounds.getCenter().lat + 0.6 * mapWidth * imgHeight / imgWidth / 2;
+    }
+    const bottomRight = [loLat, hiLng];
+    const bottomLeft = [loLat, loLng];
+    const topLeft = [hiLat, loLng];
+    const topRight = [hiLat, hiLng];
+    var overlay = L.imageOverlay.rotated(toOverlay, topLeft, topRight, bottomLeft, { interactive: true });
     overlay.addTo(leafletMap);
+    var poly = new L.Polygon([bottomLeft, topLeft, topRight, bottomRight], {
+      draggable: true,
+      opacity: 0,
+      fillOpacity: 0
+    }).addTo(leafletMap);
+    poly.on('drag', function (e) {
+      const coords = poly.dragging._transformPoints(this.dragging._matrix, {})[0]
+      overlay.reposition(coords[1], coords[2], coords[0]);
+    });
     return overlay
   }
 
@@ -98,7 +133,14 @@ function overlayMap(mapUrl, leafletMap) {
 
   if (isPdfFile(mapUrl)) {
     overlayPromise = pdfjsLib.getDocument(mapUrl).promise.then(function (pdf) {
-      return pdf.getPage(1).then(function (page) {
+      var pageNum = 1;
+      if (pdf.numPages > 1) {
+        pageNum = parseInt(window.prompt('Which page of the PDF should be used?'));
+        while (isNaN(pageNum)) {
+          pageNum = parseInt(window.prompt("Sorry, I require a number.\nWhich page of the PDF should be used?"));
+        }
+      }
+      return pdf.getPage(pageNum).then(function (page) {
         var scale = 1.5;
         var viewport = page.getViewport({ scale: scale });
 
@@ -112,17 +154,18 @@ function overlayMap(mapUrl, leafletMap) {
           canvasContext: context,
           viewport: viewport
         };
-        var renderTask = page.render(renderContext);
-        return renderTask.promise.then(function () {
-          return makeOverlay(canvas)
+        return page.render(renderContext).promise.then(function () {
+          return makeOverlay(canvas, viewport.height, viewport.width)
         });
       })
     });
   } else {
     overlayPromise = loadImage(mapUrl).then(
       function (img) {
+        canvas.height = img.naturalHeight;
+        canvas.width = img.naturalWidth;
         context.drawImage(img, 0, 0);
-        return makeOverlay(canvas);
+        return makeOverlay(canvas, img.naturalHeight, img.naturalWidth);
       }
     );
   }
@@ -135,7 +178,7 @@ function overlayMap(mapUrl, leafletMap) {
     min: 0,
     max: 1,
     step: 0.1,
-    value: 50,
+    value: 0.5,
     showValue: false,
     increment: true,
     size: '150px',
@@ -146,13 +189,14 @@ function overlayMap(mapUrl, leafletMap) {
   })
   opacitySlider.addTo(leafletMap);
 
+  leafletMap.on('click', (e) => { overlayPromise.then((ov) => { console.log(ov); }) })
+
   return overlayPromise
 }
 
 function main() {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '//mozilla.github.io/pdf.js/build/pdf.worker.js';
   var map = initMap();
-  map.on('click', (e) => { console.log(overlayPromise); })
 }
 document.addEventListener("DOMContentLoaded", function (event) {
   main()
