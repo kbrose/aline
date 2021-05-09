@@ -20,24 +20,47 @@ function initMap() {
   map.on('locationerror', onLocationError);
   map.locate({ setView: true, maxZoom: 15 });
 
-  // Overlay button
-  function overlayPdf(button, map) {
-    alert('Map is centered at: ' + map.getCenter().toString());
-  }
-  L.easyButton({
-    id: 'pdf-overlay',
+  // Link input
+  L.control.custom({
     position: 'topright',
-    type: 'replace',
-    leafletClasses: true,
-    states: [{
-      stateName: 'overlay-pdf',
-      onClick: overlayPdf,
-      title: 'overlay another map onto this map',
-      icon: '<h3>Overlay a map</h3>'
-    }]
+    content: '' +
+      '<div class="input-group">' +
+      '    <input id="link-input" type="text" class="text-input" placeholder="Link to image or PDF">' +
+      '    <button id="link-input-go" class="text-input-btn"" type="button">Go!</button>' +
+      '</div>',
+    classes: '',
   }).addTo(map);
+  document.getElementById('link-input').focus();
+  document.getElementById('link-input-go').addEventListener('click', () => { overlayButton(map) });
+  document.onkeydown = function (e) {
+    e = e || window.event;
+    e.code
+    switch (e.code) {
+      case "Enter":
+        overlayButton(map);
+        break;
+    }
+  }
 
   return map
+}
+
+function setOverlayOpacity(alpha) {
+  document.getElementById('overlay-canvas').getContext("2d").globalAlpha = alpha;
+}
+
+function overlayButton(map) {
+  const link = document.getElementById('link-input').value
+  if (link.length === 0) {
+    alert("Please copy/paste a link first")
+    return
+  }
+  // overlayMap(link, map);
+  try {
+    overlayMap(link, map)
+  } catch (error) {
+    alert(`Problem overlaying ${link}:\n${error}`)
+  }
 }
 
 function isPdfFile(url) {
@@ -48,10 +71,20 @@ function isPdfFile(url) {
   return false
 }
 
+function loadImage(url) {
+  return new Promise(resolve => {
+    const image = new Image();
+    image.addEventListener('load', () => {
+      resolve(image);
+    });
+    image.src = url;
+  });
+}
+
 function overlayMap(mapUrl, leafletMap) {
-  var topLeft = [43.07755, -89.3429];
-  var topRight = [43.095907, -89.3429];
-  var bottomLeft = [43.07755, -89.382812];
+  var topLeft = [44.890444, -87.441707];
+  var topRight = [44.890495, -87.384767];
+  var bottomLeft = [44.840871, -87.432472];
 
   function makeOverlay(toOverlay) {
     var overlay = L.imageOverlay.rotated(toOverlay, topLeft, topRight, bottomLeft, { opacity: 0.5 })
@@ -59,15 +92,18 @@ function overlayMap(mapUrl, leafletMap) {
     return overlay
   }
 
+  const canvas = document.getElementById('overlay-canvas');
+  const context = canvas.getContext('2d');
+  var overlayPromise;
+
   if (isPdfFile(mapUrl)) {
-    return pdfjsLib.getDocument(mapUrl).promise.then(function (pdf) {
+    overlayPromise = pdfjsLib.getDocument(mapUrl).promise.then(function (pdf) {
       return pdf.getPage(1).then(function (page) {
         var scale = 1.5;
         var viewport = page.getViewport({ scale: scale });
 
         // Prepare canvas using PDF page dimensions
-        var canvas = document.getElementById('pdf-canvas');
-        var context = canvas.getContext('2d');
+
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
@@ -83,23 +119,41 @@ function overlayMap(mapUrl, leafletMap) {
       })
     });
   } else {
-    return Promise.resolve(makeOverlay(mapUrl));
+    overlayPromise = loadImage(mapUrl).then(
+      function (img) {
+        context.drawImage(img, 0, 0);
+        return makeOverlay(canvas);
+      }
+    );
   }
-}
 
+  // Opacity control
+  var opacitySlider = L.control.slider(
+    (opacity) => {
+      overlayPromise.then((overlay) => { overlay.setOpacity(opacity); });
+    }, {
+    min: 0,
+    max: 1,
+    step: 0.1,
+    value: 50,
+    showValue: false,
+    increment: true,
+    size: '150px',
+    orientation: 'vertical',
+    collapsed: false,
+    syncSlider: true,
+    id: 'Opacity'
+  })
+  opacitySlider.addTo(leafletMap);
+
+  return overlayPromise
+}
 
 function main() {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '//mozilla.github.io/pdf.js/build/pdf.worker.js';
   var map = initMap();
-
-  // const mapUrl = "https://dnr.wisconsin.gov/sites/default/files/hero-images/Parks_Hero%20Image_Gov%20Nelson.jpg";
-  const mapUrl = "https://cf-store.widencdn.net/widnr/c/0/f/c0fdaa05-e6fc-436d-875d-56f36ace5d1e.pdf?response-content-disposition=inline%3B%20filename%3D%22Governor-Nelson_Summer-Map.pdf%22&response-content-type=application%2Fpdf&Expires=1620105781&Signature=KQEr1bA87dyqiL6AixJiBvF87C5aJo1aBuzKSgkxNG5FsHQW07q7Rit1YNm2~~pqJJ8EWShDFX5whciPxrd1ILIC83Qry5oE4nukT5~yqphMx14eI2i-mGnrAtt1ioJ3zVlThFcEXciFx6aUGVGQ4dv8ffzADLHAlNEj-ZqtDGCkAFYWgbJZxInzrx5r49~-we8f1e1GpFTkEFVlf2j8BUQ-9nXwwvidukpsjwmVadNTiM3QuRwf-9vPXQJi5F1m24fSHi2rSnyFDaLtRTx88LoxtD~R5-r1s86LTLxGgdL7F9ZQlCptIfz7NtEHkhc0qDXtryjSIOCOL0kl863JTQ__&Key-Pair-Id=APKAJD5XONOBVWWOA65A";
-  var overlayPromise = overlayMap(mapUrl, map);
-
-  function onMapClick(e) {
-    console.log(overlayPromise)
-  }
-  map.on('click', onMapClick);
+  map.on('click', (e) => { console.log(overlayPromise); })
 }
-
-main()
+document.addEventListener("DOMContentLoaded", function (event) {
+  main()
+});

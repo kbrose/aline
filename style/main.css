@@ -6,3 +6,19 @@ html, body, #map {
     height: 100%;
     width: 100vw;
 }
+.text-input {
+    font-size: larger;
+    height: 25px;
+    width: 200px;
+    border-width: 1px;
+    border-radius: 4px;
+    border-color: rgba(0, 0, 0, 0.2);
+}
+.text-input-btn {
+    font-size: larger;
+    height: 25px;
+    box-sizing: content-box;
+    border-width: 1px;
+    border-radius: 4px;
+    border-color: rgba(0, 0, 0, 0.2);
+}
