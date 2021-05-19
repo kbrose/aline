@@ -83,36 +83,31 @@ function loadImage(url) {
 }
 
 function overlayMap(mapUrl, leafletMap) {
-  var topLeft = [44.890444, -87.441707];
-  var topRight = [44.890495, -87.384767];
-  var bottomLeft = [44.840871, -87.432472];
-
-  function makeOverlay(toOverlay, imgHeight, imgWidth) {
-    const mapBounds = leafletMap.getBounds();
-    const mapHeight = mapBounds.getNorth() - mapBounds.getSouth();
-    // This will likely break horribly at the date line. Sorry!
-    const mapWidth = mapBounds.getEast() - mapBounds.getWest();
-    var loLng;
-    var hiLng;
-    var loLat;
-    var hiLat;
-    if ((imgHeight / imgWidth) > (mapHeight / mapWidth)) {
+  function makeOverlay(leafletMap, toOverlay, imgHeight, imgWidth) {
+    const mapPixelWidth = leafletMap.getSize().x;
+    const mapPixelHeight = leafletMap.getSize().y;
+    var bottomRight, bottomLeft, topLeft, topRight;
+    if ((imgHeight / imgWidth) > (mapPixelHeight / mapPixelWidth)) {
       // image is more vertical than map view
-      loLat = mapBounds.getSouth() + mapHeight * 0.2;
-      hiLat = mapBounds.getNorth() - mapHeight * 0.2;
-      loLng = mapBounds.getCenter().lng - 0.6 * mapHeight * imgWidth / imgHeight / 2;
-      hiLng = mapBounds.getCenter().lng + 0.6 * mapHeight * imgWidth / imgHeight / 2;
+      const width = mapPixelHeight * imgWidth / imgHeight * 0.9;
+      const widthOffset = (mapPixelWidth - width) / 2;
+      const height = mapPixelHeight * 0.9
+      const heightOffset = mapPixelHeight * 0.05;
+      bottomRight = leafletMap.containerPointToLatLng([width + widthOffset, height + heightOffset]);
+      bottomLeft = leafletMap.containerPointToLatLng([widthOffset, height + heightOffset]);
+      topRight = leafletMap.containerPointToLatLng([width + widthOffset, heightOffset]);
+      topLeft = leafletMap.containerPointToLatLng([widthOffset, heightOffset]);
     } else {
-      // image is more vertical than map view
-      loLng = mapBounds.getWest() + mapWidth * 0.2;
-      hiLng = mapBounds.getEast() - mapWidth * 0.2;
-      loLat = mapBounds.getCenter().lat - 0.6 * mapWidth * imgHeight / imgWidth / 2;
-      hiLat = mapBounds.getCenter().lat + 0.6 * mapWidth * imgHeight / imgWidth / 2;
+      // map view is more vertical than image
+      const width = mapPixelWidth * 0.9;
+      const widthOffset = mapPixelWidth * 0.05;
+      const height = mapPixelWidth * imgHeight / imgWidth * 0.9
+      const heightOffset = (mapPixelHeight - height) / 2;
+      bottomRight = leafletMap.containerPointToLatLng([width + widthOffset, height + heightOffset]);
+      bottomLeft = leafletMap.containerPointToLatLng([widthOffset, height + heightOffset]);
+      topRight = leafletMap.containerPointToLatLng([width + widthOffset, heightOffset]);
+      topLeft = leafletMap.containerPointToLatLng([widthOffset, heightOffset]);
     }
-    const bottomRight = [loLat, hiLng];
-    const bottomLeft = [loLat, loLng];
-    const topLeft = [hiLat, loLng];
-    const topRight = [hiLat, hiLng];
     var overlay = L.imageOverlay.rotated(toOverlay, topLeft, topRight, bottomLeft, { interactive: true });
     overlay.addTo(leafletMap);
     var poly = new L.Polygon([bottomLeft, topLeft, topRight, bottomRight], {
@@ -141,7 +136,7 @@ function overlayMap(mapUrl, leafletMap) {
         }
       }
       return pdf.getPage(pageNum).then(function (page) {
-        var scale = 1.5;
+        var scale = 2;
         var viewport = page.getViewport({ scale: scale });
 
         // Prepare canvas using PDF page dimensions
@@ -155,7 +150,7 @@ function overlayMap(mapUrl, leafletMap) {
           viewport: viewport
         };
         return page.render(renderContext).promise.then(function () {
-          return makeOverlay(canvas, viewport.height, viewport.width)
+          return makeOverlay(leafletMap, canvas, viewport.height, viewport.width)
         });
       })
     });
@@ -165,7 +160,7 @@ function overlayMap(mapUrl, leafletMap) {
         canvas.height = img.naturalHeight;
         canvas.width = img.naturalWidth;
         context.drawImage(img, 0, 0);
-        return makeOverlay(canvas, img.naturalHeight, img.naturalWidth);
+        return makeOverlay(leafletMap, canvas, img.naturalHeight, img.naturalWidth);
       }
     );
   }
@@ -195,8 +190,8 @@ function overlayMap(mapUrl, leafletMap) {
 }
 
 function main() {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '//mozilla.github.io/pdf.js/build/pdf.worker.js';
-  var map = initMap();
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+  initMap();
 }
 document.addEventListener("DOMContentLoaded", function (event) {
   main()
