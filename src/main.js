@@ -125,11 +125,10 @@ function overlayMap(mapUrl, leafletMap) {
     poly.on('transform', function (e) {
       const trans = poly.transform
       const coords = poly.getLatLngs()[0];
-      // This matrix has unexpected translations in it causing bad transforms
       const m = trans._matrix;
-      const map = poly._map
+      const map = poly._map;
       function transform(coord) {
-        return map.unproject(m.transform(map.project(coord)))
+        return map.layerPointToLatLng(m.transform(map.latLngToLayerPoint(coord)));
       }
       overlay.reposition(transform(coords[1]), transform(coords[2]), transform(coords[0]));
     })
@@ -198,7 +197,7 @@ function overlayMap(mapUrl, leafletMap) {
   })
   opacitySlider.addTo(leafletMap);
 
-  leafletMap.on('click', (e) => { overlayPromise.then((ov) => { console.log(ov); }) })
+  leafletMap.on('click', (e) => { console.log(e) })
 
   return overlayPromise
 }
