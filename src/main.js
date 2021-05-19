@@ -112,13 +112,27 @@ function overlayMap(mapUrl, leafletMap) {
     overlay.addTo(leafletMap);
     var poly = new L.Polygon([bottomLeft, topLeft, topRight, bottomRight], {
       draggable: true,
+      transform: true,
       opacity: 0,
       fillOpacity: 0
     }).addTo(leafletMap);
+    poly.transform.enable();
+    poly.transform.setOptions({ rotation: true, scaling: true });
     poly.on('drag', function (e) {
-      const coords = poly.dragging._transformPoints(this.dragging._matrix, {})[0]
+      const coords = poly.getLatLngs()[0];
       overlay.reposition(coords[1], coords[2], coords[0]);
     });
+    poly.on('transform', function (e) {
+      const trans = poly.transform
+      const coords = poly.getLatLngs()[0];
+      // This matrix has unexpected translations in it causing bad transforms
+      const m = trans._matrix;
+      const map = poly._map
+      function transform(coord) {
+        return map.unproject(m.transform(map.project(coord)))
+      }
+      overlay.reposition(transform(coords[1]), transform(coords[2]), transform(coords[0]));
+    })
     return overlay
   }
 
