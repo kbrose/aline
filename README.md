@@ -2,6 +2,6 @@
 
 Overlay a pdf or an image onto a map!
 
-kbrose.github.io/aline/
+https://kbrose.github.io/aline/
 
 ![](static/example.png)
