@@ -160,6 +160,8 @@ function overlayMap(mapUrl, leafletMap) {
         // Render PDF page into canvas context
         var renderContext = {
           canvasContext: context,
+          // Use transparent background!
+          background: 'rgba(0,0,0,0)',
           viewport: viewport
         };
         return page.render(renderContext).promise.then(function () {
