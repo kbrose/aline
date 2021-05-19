@@ -42,7 +42,7 @@ function initMap() {
         "" +
         '<div class="input-group">' +
         '    <input id="link-input" type="text" class="text-input" placeholder="Link to image or PDF">' +
-        '    <button id="link-input-go" class="text-input-btn"" type="button">Go!</button>' +
+        '    <button id="link-input-go" class="text-input-btn" type="button">Go!</button>' +
         "</div>",
       classes: "",
     })
@@ -169,11 +169,11 @@ function overlayMap(mapUrl, leafletMap) {
     poly.on("transform", function (e) {
       const trans = poly.transform;
       const coords = poly.getLatLngs()[0];
-      const m = trans._matrix;
+      const matrix = trans._matrix;
       const map = poly._map;
       function transform(coord) {
         return map.layerPointToLatLng(
-          m.transform(map.latLngToLayerPoint(coord))
+          matrix.transform(map.latLngToLayerPoint(coord))
         );
       }
       overlay.reposition(
